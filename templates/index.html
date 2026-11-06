@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetForge - Network Design, Validation &amp; Simulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">NF</span>
+      <div class="brand-text"><span class="brand-name">NetForge</span><span class="brand-sub">design · validate · simulate</span></div>
+    </div>
+    <input id="proj-name" class="proj-name" value="Untitled project" spellcheck="false" title="Project name">
+    <div class="topbar-actions">
+      <select id="tpl-select" class="field sel-sm" title="Load an example lab"><option value="">Example labs…</option></select>
+      <button id="btn-projects" class="btn btn-outline">Projects</button>
+      <button id="btn-export" class="btn btn-outline">Export</button>
+      <button id="btn-import" class="btn btn-outline">Import</button>
+      <input id="import-file" type="file" accept=".json,application/json" hidden>
+      <button id="btn-configs" class="btn btn-outline">Configs</button>
+      <button id="btn-validate" class="btn btn-solid">Validate</button>
+      <span class="status-chip" id="status-chip">not validated</span>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="panel toolbox">
+      <div class="panel-title">Add device</div>
+      <button class="tool" data-type="router"><span class="tool-icon icon-router"></span> Router</button>
+      <button class="tool" data-type="switch"><span class="tool-icon icon-switch"></span> Switch</button>
+      <button class="tool" data-type="host"><span class="tool-icon icon-host"></span> Host</button>
+      <button id="btn-link-mode" class="tool"><span class="tool-icon icon-link"></span> Draw link</button>
+      <p class="hint">Pick a device, click the canvas to place it. Drag to move. Click a link to edit it or take it down.</p>
+
+      <div class="panel-title gap">Routing</div>
+      <label class="field-label">Protocol</label>
+      <select id="protocol" class="field">
+        <option value="ospf">OSPF (lowest link cost)</option>
+        <option value="rip">RIP (fewest hops)</option>
+      </select>
+      <button id="btn-routing" class="btn btn-outline wide">Routing tables</button>
+
+      <div class="panel-title gap">Simulate</div>
+      <label class="field-label">From</label><select id="sim-src" class="field"></select>
+      <label class="field-label">To</label><select id="sim-dst" class="field"></select>
+      <div class="btn-row">
+        <button id="btn-ping" class="btn btn-solid">Ping</button>
+        <button id="btn-trace" class="btn btn-outline">Traceroute</button>
+      </div>
+      <button id="btn-compare" class="btn btn-outline wide">Compare RIP vs OSPF</button>
+
+      <div class="panel-title gap">Tools</div>
+      <button id="btn-matrix" class="btn btn-outline wide">Reachability matrix</button>
+      <button id="btn-subnet" class="btn btn-outline wide">Subnet calculator</button>
+      <button id="btn-new" class="btn btn-outline wide">New / clear</button>
+    </aside>
+
+    <main class="canvas-wrap">
+      <svg id="canvas" viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#1E2C46"></circle></pattern>
+        </defs>
+        <rect width="1000" height="700" fill="url(#grid)"></rect>
+        <g id="links-layer"></g>
+        <g id="pulse-layer"></g>
+        <g id="nodes-layer"></g>
+      </svg>
+      <div class="canvas-empty" id="canvas-empty">
+        <span>Empty canvas</span>
+        <span class="canvas-empty-sub">Load an example lab from the top bar, or add devices from the left.</span>
+      </div>
+    </main>
+
+    <aside class="panel properties" id="properties"></aside>
+  </div>
+
+  <footer class="console">
+    <div class="console-header"><span>console</span><button id="btn-clear-console" class="btn-clear">clear</button></div>
+    <div class="console-body" id="console-body"></div>
+  </footer>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><span id="modal-title"></span><button id="modal-close" class="btn-clear">close ✕</button></div>
+    <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
