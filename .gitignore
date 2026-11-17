@@ -16,6 +16,7 @@ ENV/
 .env
 .env.*
 !.env.example
+.secret_key
 
 # Local databases and SQLite sidecar files
 *.db

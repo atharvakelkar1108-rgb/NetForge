@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ 'Create account' if mode == 'register' else 'Log in' }} - NetForge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/site.css">
+</head>
+<body>
+<div class="auth">
+  <aside class="auth-side">
+    <div>
+      <a class="logo" href="/"><i>NF</i> NetForge</a>
+      <h2>Design, validate and simulate networks.</h2>
+      <p class="sub">Sign in to open the interface and keep your projects saved to your account.</p>
+      <ul>
+        <li>Draw topologies with routers, switches and hosts</li>
+        <li>24 validation rules with suggested fixes</li>
+        <li>OSPF vs RIP, link failure, firewall ACLs and VLANs</li>
+      </ul>
+    </div>
+    <a class="back" href="/">← Back to home</a>
+  </aside>
+
+  <main class="auth-main">
+    <div class="box">
+      {% if mode == 'register' %}
+        <h1>Create your account</h1><p class="sub">It takes a few seconds.</p>
+      {% else %}
+        <h1>Welcome back</h1><p class="sub">Log in to open the NetForge interface.</p>
+      {% endif %}
+
+      {% if error %}<div class="err" role="alert">{{ error }}</div>{% endif %}
+
+      <form method="post" action="{{ '/register' if mode == 'register' else '/login' }}" autocomplete="on">
+        <input type="hidden" name="next" value="{{ next or '' }}">
+
+        <label for="username">Username</label>
+        <input class="in" id="username" name="username" value="{{ username or '' }}" autocomplete="username" required autofocus
+               {% if mode == 'register' %}minlength="3" maxlength="32" pattern="[A-Za-z0-9_.\-]+" title="Letters, numbers, dot, dash or underscore"{% endif %}>
+
+        <label for="password">Password</label>
+        <div class="pw">
+          <input class="in" id="password" type="password" name="password" required
+                 autocomplete="{{ 'new-password' if mode == 'register' else 'current-password' }}" {% if mode == 'register' %}minlength="6"{% endif %}>
+          <button type="button" data-toggle-pw="password">show</button>
+        </div>
+
+        {% if mode == 'register' %}
+          <label for="confirm">Confirm password</label>
+          <div class="pw">
+            <input class="in" id="confirm" type="password" name="confirm" required autocomplete="new-password" minlength="6">
+            <button type="button" data-toggle-pw="confirm">show</button>
+          </div>
+          <div class="hintm" id="pw-hint">At least 6 characters.</div>
+        {% else %}
+          <label class="chk"><input type="checkbox" name="remember" value="1"> Keep me signed in for 7 days</label>
+        {% endif %}
+
+        <button class="btn solid big" type="submit">{{ 'Create account and open interface' if mode == 'register' else 'Log in' }}</button>
+      </form>
+
+      <div class="swap">
+        {% if mode == 'register' %}Already have an account? <a href="/login{{ '?next=' ~ (next|urlencode) if next else '' }}">Log in</a>
+        {% else %}New here? <a href="/register{{ '?next=' ~ (next|urlencode) if next else '' }}">Create an account</a>{% endif %}
+      </div>
+    </div>
+  </main>
+</div>
+<script src="/static/auth.js"></script>
+</body>
+</html>

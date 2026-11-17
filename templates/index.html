@@ -12,10 +12,10 @@
 <div class="app">
 
   <header class="topbar">
-    <div class="brand">
+    <a class="brand" href="/" title="Back to home" style="text-decoration:none;color:inherit">
       <span class="brand-mark">NF</span>
       <div class="brand-text"><span class="brand-name">NetForge</span><span class="brand-sub">design · validate · simulate</span></div>
-    </div>
+    </a>
     <input id="proj-name" class="proj-name" value="Untitled project" spellcheck="false" title="Project name">
     <div class="topbar-actions">
       <select id="tpl-select" class="field sel-sm" title="Load an example lab"><option value="">Example labs…</option></select>
@@ -26,6 +26,8 @@
       <button id="btn-configs" class="btn btn-outline">Configs</button>
       <button id="btn-validate" class="btn btn-solid">Validate</button>
       <span class="status-chip" id="status-chip">not validated</span>
+      <span class="status-chip" title="Signed in">{{ user }}</span>
+      <form method="post" action="/logout" style="margin:0"><button class="btn btn-outline">Log out</button></form>
     </div>
   </header>
 
@@ -93,6 +95,7 @@
   </div>
 </div>
 
+<script src="/static/auth.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

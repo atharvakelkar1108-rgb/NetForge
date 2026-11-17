@@ -5,8 +5,21 @@
 ```bash
 pip install flask
 python app.py          # then open http://localhost:5000
-python -m unittest discover -s tests -v     # 17 tests
+python -m unittest discover -s tests -v     # 30 tests
 ```
+
+## Pages and accounts
+
+| URL | What |
+|---|---|
+| `/` | Home page (public): what NetForge is, features, example labs |
+| `/register`, `/login` | Create an account / sign in (passwords are hashed, never stored as text) |
+| `/app` | The interface. Needs login, otherwise you are sent to `/login` and brought back after |
+| `/logout` | Sign out (button in the interface and on the home page) |
+
+Each user has private saved projects. All `/api/*` routes need a signed-in user.
+Extras: 7-day "keep me signed in", brute-force throttle (5 wrong passwords then a 5-minute lock), open-redirect protection.
+Accounts live in `netforge.db`; the session key is generated once into `.secret_key` (or set `NETFORGE_SECRET`).
 
 ## What it does (one paragraph)
 
@@ -24,7 +37,8 @@ hop by hop (ARP, TTL, routing lookups, firewall ACLs, VLANs, failed links) with 
 | Simulation | Ping (request **and** reply), traceroute with RTT, ARP, TTL, animated forward/return path |
 | **Novelty** | **Compare RIP vs OSPF** on the same packet · **Link failure & automatic reroute** · **Firewall ACLs** with the blocking rule shown · **VLAN isolation** through switches · **Routing-loop detection** · **Reachability matrix** (all hosts pinging all hosts) · **Cisco-style config generator** · Subnet calculator |
 | Persistence | Named projects in SQLite, JSON import/export, 5 example labs |
-| Quality | Stateless API, 17 unit tests |
+| Accounts | Home page, sign-up/login/logout, per-user saved projects |
+| Quality | Stateless API, 30 unit tests |
 
 ## Validation rules
 
@@ -38,12 +52,12 @@ static_nexthop_unreachable, invalid_acl, isolated_node, l2_loop, partitioned_top
 ```
 Browser (HTML/CSS/vanilla JS + SVG)  --JSON-->  Flask (app.py, stateless REST API)
                                                    |
-                                  netcore/  model.py       topology model + Layer-2 reachability (VLAN-aware)
+                                  netcore/  store.py       SQLite: users + per-user projects
+                                            model.py       topology model + Layer-2 reachability (VLAN-aware)
                                             validation.py  rules engine
                                             routing.py     OSPF/RIP tables, loop detection
                                             simulation.py  packet forwarding, ping, traceroute, matrix, compare
                                             configgen.py   Cisco-style config export
-                                            store.py       SQLite projects
                                             templates_data.py  5 example labs
 ```
 
@@ -59,6 +73,7 @@ Every request carries the whole topology, so the server always works on exactly 
 
 ## Review demo (about 6 minutes)
 
+0. Open the **home page**, click *Get started*, create an account (or log in): you land in the interface.
 1. **Example labs → "1. Simple LAN"** → *Validate* (health 100) → select H1 → H3 → *Ping*. Say: same subnet, so ARP and direct delivery through the switch.
 2. **"5. Find the bugs"** → *Validate*. Red rings show duplicate IP, wrong gateway, mask mismatch, VLAN mismatch, isolated host — each with a suggested fix.
 3. **"2. RIP vs OSPF"** → From H1 To H2 → **Compare RIP vs OSPF**. RIP takes the 1-hop expensive link, OSPF takes the cheaper longer path. Then *Routing tables*.

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetForge - Design, validate and simulate networks in your browser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/site.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="logo" href="/"><i>NF</i> NetForge</a>
+    <div class="nav-links"><a href="#features">Features</a><a href="#how">How it works</a><a href="#labs">Example labs</a></div>
+    <div class="nav-right">
+      {% if user %}
+        <span class="who">signed in as {{ user }}</span>
+        <a class="btn solid" href="/app">Open interface</a>
+        <form class="inline" method="post" action="/logout"><button class="btn">Log out</button></form>
+      {% else %}
+        <a class="btn" href="/login">Log in</a>
+        <a class="btn solid" href="/register">Sign up</a>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Computer Network Technology · course project</div>
+      <h1>Design a network. <em>Catch the mistakes.</em> Watch the packets move.</h1>
+      <p class="lead">NetForge is a web-based framework where you draw a network, validate its configuration against real networking rules, and simulate how traffic flows through it, hop by hop.</p>
+      <div class="cta">
+        <a class="btn solid big" href="/app">{% if user %}Open interface{% else %}Get started{% endif %}</a>
+        {% if not user %}<a class="btn big" href="/login">I already have an account</a>{% endif %}
+      </div>
+      <div class="stats">
+        <div><b>24</b>validation rules</div>
+        <div><b>OSPF + RIP</b>routing</div>
+        <div><b>5</b>example labs</div>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 320" role="img" aria-label="A packet rerouting around a failed link">
+        <path class="l" d="M70 160H220"/><path class="l" d="M220 160L370 80"/><path class="l" d="M370 80L520 160"/>
+        <path class="lx" d="M220 160L370 240"/><path class="l" d="M370 240L520 160"/><path class="l" d="M520 160H670"/>
+        <text class="te" x="268" y="222">link down</text>
+        <circle class="n" cx="70" cy="160" r="20"/><text class="t" x="70" y="204">H1</text><text class="tm" x="70" y="218">10.0.1.10</text>
+        <polygon class="n" points="220,134 246,160 220,186 194,160"/><text class="t" x="220" y="204">R1</text>
+        <polygon class="n" points="370,54 396,80 370,106 344,80"/><text class="t" x="370" y="40">R2</text>
+        <polygon class="n" points="370,214 396,240 370,266 344,240"/><text class="t" x="370" y="290">R3</text>
+        <polygon class="n" points="520,134 546,160 520,186 494,160"/><text class="t" x="520" y="204">R4</text>
+        <circle class="n" cx="670" cy="160" r="20"/><text class="t" x="670" y="204">H2</text><text class="tm" x="670" y="218">10.0.4.10</text>
+        <circle class="pk" r="6"><animateMotion dur="3.6s" repeatCount="indefinite" path="M70 160H220L370 80L520 160H670"/></circle>
+      </svg>
+      <div class="dg-cap">$ ping 10.0.4.10 &nbsp;→&nbsp; OSPF reroutes via R2 around the failed link</div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head"><div class="eyebrow">Features</div><h2>Three jobs, one tool</h2><p class="sub">Everything runs on one topology you draw: the same network is designed, checked and simulated.</p></div>
+    <div class="grid">
+      <div class="card"><div class="tag">Design</div><h3>Visual topology builder</h3><p>Drag routers, switches and hosts onto a canvas, connect them, and configure IPs, masks, VLANs, gateways and static routes.</p></div>
+      <div class="card"><div class="tag">Validate</div><h3>24 configuration rules</h3><p>Duplicate IPs, subnet and VLAN mismatches, bad gateways, loops. Faulty devices are circled in red with a suggested fix and a health score.</p></div>
+      <div class="card"><div class="tag">Simulate</div><h3>Hop-by-hop packets</h3><p>Ping and traceroute with ARP, TTL and routing lookups. The reply must return too, so one-way misconfigurations show up as timeouts.</p></div>
+      <div class="card"><div class="tag">Routing</div><h3>OSPF vs RIP</h3><p>OSPF picks the lowest link cost, RIP the fewest hops. Compare both on the same packet and see the paths differ.</p></div>
+      <div class="card"><div class="tag">Resilience</div><h3>Failure and reroute</h3><p>Take any link down and watch traffic find another path, or fail when none is left.</p></div>
+      <div class="card"><div class="tag">Security</div><h3>Firewall ACLs and VLANs</h3><p>Block specific hosts on a router and see exactly which rule stopped the packet. VLANs isolate hosts across a switch.</p></div>
+      <div class="card"><div class="tag">Insight</div><h3>Reachability matrix</h3><p>Every host pings every other host in one click, so a single broken rule shows up as a red cell.</p></div>
+      <div class="card"><div class="tag">Export</div><h3>Cisco-style configs</h3><p>Generate ready-to-read configuration for each device, including access lists, then save projects to your account.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head"><div class="eyebrow">How it works</div><h2>From drawing to proof in three steps</h2></div>
+    <div class="three">
+      <div class="step"><div class="num">01</div><h3>Design</h3><p>Place devices, draw links and type in the addressing. Or load one of the example labs.</p></div>
+      <div class="step"><div class="num">02</div><h3>Validate</h3><p>One click checks the whole network against the rules and shows what is wrong and how to fix it.</p></div>
+      <div class="step"><div class="num">03</div><h3>Simulate</h3><p>Ping or trace between any two devices, break a link, add a firewall rule, and watch what changes.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="labs">
+  <div class="wrap">
+    <div class="sec-head"><div class="eyebrow">Example labs</div><h2>Ready-made scenarios</h2><p class="sub">Sign in and pick any of these from the "Example labs" menu to see a feature in action.</p></div>
+    <div class="grid">
+      <div class="card"><div class="tag">Lab 1</div><h3>Simple LAN</h3><p>A clean network: validation passes and pings work.</p></div>
+      <div class="card"><div class="tag">Lab 2</div><h3>RIP vs OSPF</h3><p>The same packet takes two different paths.</p></div>
+      <div class="card"><div class="tag">Lab 3</div><h3>Link failure and reroute</h3><p>Cut a link, ping again, and traffic goes around.</p></div>
+      <div class="card"><div class="tag">Lab 4</div><h3>Firewall (ACL)</h3><p>One host is blocked from a server by a router rule.</p></div>
+      <div class="card"><div class="tag">Lab 5</div><h3>Find the bugs</h3><p>A deliberately broken network to debug with the validator.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="band">
+      <div><h2>{% if user %}Your workspace is ready.{% else %}Create a free account to start.{% endif %}</h2><p class="sub">{% if user %}Pick up where you left off.{% else %}Your saved projects stay private to your account.{% endif %}</p></div>
+      {% if user %}<a class="btn solid big" href="/app">Open interface</a>{% else %}<a class="btn solid big" href="/register">Sign up and open the interface</a>{% endif %}
+    </div>
+  </div>
+</section>
+
+<footer><div class="wrap"><span>NetForge · Web-Based Framework for Network Design, Configuration Validation and Communication Simulation</span><span>Computer Network Technology</span></div></footer>
+
+</body>
+</html>
