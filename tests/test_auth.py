@@ -35,7 +35,7 @@ class AuthTests(unittest.TestCase):
         self.assertIn("/login", r.headers["Location"])
 
     def test_api_requires_login(self):
-        for path in ("/api/validate", "/api/ping", "/api/configs"):
+        for path in ("/api/validate", "/api/fix", "/api/ping", "/api/configs", "/api/resilience"):
             self.assertEqual(self.c.post(path, json={}).status_code, 401, path)
         self.assertEqual(self.c.get("/api/templates").status_code, 401)
         self.assertEqual(self.c.get("/api/projects").status_code, 401)

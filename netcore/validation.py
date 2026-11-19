@@ -7,7 +7,7 @@ from __future__ import annotations
 import ipaddress
 from collections import defaultdict
 
-from .model import Net
+from .model import Net, normalise
 from .routing import compute_tables, find_loops
 
 
@@ -26,14 +26,58 @@ class _UF:
         self.p[self.find(a)] = self.find(b)
 
 
+def _gateway_fix(net, node):
+    for ifn, ip in net.up_ifaces(node["id"]):
+        for peer in net.l2_reach(node["id"], ifn):
+            pip = net.ipif(*peer)
+            if (pip and pip.ip in ip.network
+                    and net.nodes[peer[0]]["type"] == "router"):
+                return {"type": "gateway", "node": node["id"], "address": str(pip.ip)}
+    return None
+
+
+def _duplicate_ip_fix(owners, all_ips):
+    used = {ipaddress.IPv4Address(ip) for ip in all_ips}
+    targets = []
+    for node, iface in owners[1:]:
+        try:
+            ip = ipaddress.IPv4Address(iface["ip"])
+            network = ipaddress.IPv4Network(f'{ip}/{iface["mask"]}', strict=False)
+        except ValueError:
+            return None
+        low = int(network.network_address) + (1 if network.prefixlen < 31 else 0)
+        high = int(network.broadcast_address) - (1 if network.prefixlen < 31 else 0)
+        if low > high:
+            return None
+        start = int(ip) + 1
+        if start > high:
+            start = low
+        capacity = high - low + 1
+        candidate = None
+        for offset in range(min(capacity, len(used) + 1)):
+            value = low + ((start - low + offset) % capacity)
+            address = ipaddress.IPv4Address(value)
+            if address not in used:
+                candidate = address
+                used.add(address)
+                break
+        if candidate is None:
+            return None
+        targets.append({"node": node["id"], "iface": iface["name"], "ip": str(candidate)})
+    return {"type": "duplicate_ip", "targets": targets} if targets else None
+
+
 def validate(topo):
     net = Net(topo)
     nodes = topo["nodes"]
     issues = []
 
-    def add(sev, rule, msg, fix="", ns=(), ls=()):
-        issues.append({"severity": sev, "rule": rule, "message": msg, "fix": fix,
-                       "nodes": list(ns), "links": list(ls)})
+    def add(sev, rule, msg, fix="", ns=(), ls=(), autofix=None):
+        issue = {"severity": sev, "rule": rule, "message": msg, "fix": fix,
+                 "nodes": list(ns), "links": list(ls)}
+        if autofix:
+            issue["autofix"] = autofix
+        issues.append(issue)
 
     # --- links --------------------------------------------------------
     for l in net.dangling:
@@ -69,7 +113,8 @@ def validate(topo):
         if len(owners) > 1:
             who = ", ".join(f"{n['hostname']}:{i['name']}" for n, i in owners)
             add("error", "duplicate_ip", f"IP {ip} is configured on more than one interface ({who}).",
-                "Every interface needs a unique IP address.", [n["id"] for n, _ in owners])
+                "Every interface needs a unique IP address.", [n["id"] for n, _ in owners],
+                autofix=_duplicate_ip_fix(owners, ips.keys()))
     hn = defaultdict(list)
     for n in nodes:
         hn[n["hostname"]].append(n["id"])
@@ -93,10 +138,19 @@ def validate(topo):
                 key = frozenset([me, peer])
                 if pip and pip.network != ip.network and key not in pair_seen:
                     pair_seen.add(key)
+                    if ipaddress.IPv4Network((pip.ip, ip.network.prefixlen), strict=False) == ip.network:
+                        mask_fix = {"type": "mask", "node": peer[0], "iface": peer[1],
+                                    "mask": str(ip.network.prefixlen)}
+                    elif ipaddress.IPv4Network((ip.ip, pip.network.prefixlen), strict=False) == pip.network:
+                        mask_fix = {"type": "mask", "node": n["id"], "iface": ifn,
+                                    "mask": str(pip.network.prefixlen)}
+                    else:
+                        mask_fix = None
                     add("error", "subnet_mismatch",
                         f"{n['hostname']}:{ifn} ({ip.network}) and {net.name(peer[0])}:{peer[1]} ({pip.network}) "
                         f"share a segment but are in different subnets.",
-                        "Put both on the same network/mask, or separate them with a router.", [n["id"], peer[0]])
+                        "Put both on the same network/mask, or separate them with a router.", [n["id"], peer[0]],
+                        autofix=mask_fix)
             for peer in net.l2_reach(n["id"], ifn, ignore_vlan=True):
                 pip = net.ipif(*peer)
                 key = frozenset([me, peer, "vlan"])
@@ -105,7 +159,9 @@ def validate(topo):
                     add("warning", "vlan_mismatch",
                         f"{n['hostname']} (VLAN {net.vlan(n['id'], ifn)}) and {net.name(peer[0])} (VLAN {net.vlan(*peer)}) "
                         f"are on the same subnet but in different VLANs, so they cannot talk.",
-                        "Give both interfaces the same VLAN id.", [n["id"], peer[0]])
+                        "Give both interfaces the same VLAN id.", [n["id"], peer[0]],
+                        autofix={"type": "vlan", "node": peer[0], "iface": peer[1],
+                                 "vlan": net.vlan(n["id"], ifn)})
     for netw, members in net_members.items():
         roots = {uf.find(m) for m in members}
         if len(roots) > 1:
@@ -138,26 +194,31 @@ def validate(topo):
         if not gw:
             if has_router:
                 add("warning", "missing_gateway", f"{n['hostname']} has no default gateway.",
-                    "Set it to the router interface on this host's subnet.", [n["id"]])
+                    "Set it to the router interface on this host's subnet.", [n["id"]],
+                    autofix=_gateway_fix(net, n))
             continue
         try:
             gwa = ipaddress.IPv4Address(gw)
         except ValueError:
-            add("error", "invalid_gateway", f"{n['hostname']}: gateway '{gw}' is not a valid IP.", "", [n["id"]])
+            add("error", "invalid_gateway", f"{n['hostname']}: gateway '{gw}' is not a valid IP.",
+                "Set the gateway to a router interface on this host's subnet.", [n["id"]],
+                autofix=_gateway_fix(net, n))
             continue
         home = next(((ifn, ip) for ifn, ip in ups if gwa in ip.network), None)
         if not home:
             add("error", "gateway_not_in_subnet", f"{n['hostname']}'s gateway {gw} is not inside any of its subnets.",
-                "The gateway must be an address in the host's own subnet.", [n["id"]])
+                "The gateway must be an address in the host's own subnet.", [n["id"]],
+                autofix=_gateway_fix(net, n))
             continue
         owner = next((p for p in net.l2_reach(n["id"], home[0])
                       if (net.ipif(*p) and net.ipif(*p).ip == gwa)), None)
         if not owner:
             add("error", "gateway_unreachable", f"{n['hostname']}'s gateway {gw} does not exist on its network segment.",
-                "Set the gateway to an IP that a router interface really has on this subnet.", [n["id"]])
+                "Set the gateway to an IP that a router interface really has on this subnet.", [n["id"]],
+                autofix=_gateway_fix(net, n))
         elif net.nodes[owner[0]]["type"] != "router":
             add("warning", "gateway_not_router", f"{n['hostname']}'s gateway {gw} belongs to {net.name(owner[0])}, which is not a router.",
-                "", [n["id"], owner[0]])
+                "", [n["id"], owner[0]], autofix=_gateway_fix(net, n))
 
     # --- routers: static routes & ACL syntax --------------------------
     for n in nodes:
@@ -219,3 +280,40 @@ def validate(topo):
     warns = sum(i["severity"] == "warning" for i in issues)
     return {"ok": errors == 0, "issues": issues, "errors": errors, "warnings": warns,
             "score": max(0, 100 - 15 * errors - 5 * warns), "issue_count": len(issues)}
+
+
+def apply_fix(topo, issue_index):
+    """Apply one currently-valid, explicitly supported validation fix."""
+    result = normalise(topo)
+    issues = validate(result)["issues"]
+    if not isinstance(issue_index, int) or issue_index < 0 or issue_index >= len(issues):
+        raise ValueError("That validation issue is no longer available.")
+    fix = issues[issue_index].get("autofix")
+    if not fix:
+        raise ValueError("There is no safe automatic fix for this issue.")
+
+    nodes = {node["id"]: node for node in result["nodes"]}
+
+    def interface(node_id, name):
+        node = nodes.get(node_id)
+        if not node:
+            raise ValueError("The affected device no longer exists.")
+        iface = next((item for item in node["interfaces"] if item["name"] == name), None)
+        if not iface:
+            raise ValueError("The affected interface no longer exists.")
+        return iface
+
+    if fix["type"] == "duplicate_ip":
+        for target in fix["targets"]:
+            interface(target["node"], target["iface"])["ip"] = target["ip"]
+    elif fix["type"] == "gateway":
+        if fix["node"] not in nodes:
+            raise ValueError("The affected device no longer exists.")
+        nodes[fix["node"]]["gateway"] = fix["address"]
+    elif fix["type"] in ("mask", "vlan"):
+        iface = interface(fix["node"], fix["iface"])
+        iface["mask" if fix["type"] == "mask" else "vlan"] = (
+            fix["mask"] if fix["type"] == "mask" else fix["vlan"])
+    else:
+        raise ValueError("This automatic fix is not supported.")
+    return result

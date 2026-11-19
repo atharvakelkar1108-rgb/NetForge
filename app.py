@@ -23,7 +23,7 @@ from netcore.configgen import generate
 from netcore.model import Net, normalise
 from netcore.routing import compute_tables, find_loops
 from netcore.templates_data import TEMPLATES, list_templates
-from netcore.validation import validate
+from netcore.validation import apply_fix, validate
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
@@ -160,6 +160,23 @@ def api_validate():
     return jsonify(validate(topo))
 
 
+@app.post("/api/fix")
+def api_fix():
+    d, topo, _n = _ctx()
+    issue_index = d.get("issue_index")
+    current = validate(topo)["issues"]
+    if (not isinstance(issue_index, int) or isinstance(issue_index, bool)
+            or issue_index < 0 or issue_index >= len(current)
+            or current[issue_index]["rule"] != d.get("issue_rule")
+            or current[issue_index]["message"] != d.get("issue_message")):
+        return jsonify({"error": "That validation issue is no longer available. Validate again and retry."}), 409
+    try:
+        fixed = apply_fix(topo, issue_index)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"topology": fixed, "validation": validate(fixed)})
+
+
 @app.post("/api/routing")
 def api_routing():
     _, _t, net = _ctx()
@@ -187,6 +204,12 @@ def api_trace():
 def api_matrix():
     _, _t, net = _ctx()
     return jsonify(sim.matrix(net, compute_tables(net)))
+
+
+@app.post("/api/resilience")
+def api_resilience():
+    _, _t, net = _ctx()
+    return jsonify(sim.resilience(net))
 
 
 @app.post("/api/compare")

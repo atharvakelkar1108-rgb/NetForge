@@ -272,12 +272,35 @@ $("btn-trace").onclick = () => simulate("trace");
 // ---------- validate --------------------------------------------------------
 async function runValidate() {
   const r = await api("/api/validate");
-  overlay.issueNodes = new Set(r.issues.flatMap(i => i.nodes)); overlay.issueLinks = new Set(r.issues.flatMap(i => i.links)); renderCanvas();
   log(`— validation: ${r.errors} error(s), ${r.warnings} warning(s) —`, "muted");
   if (!r.issues.length) log("✓ No issues. Every rule passed.", "ok");
   r.issues.forEach(i => { log(`[${i.severity.toUpperCase()}] ${i.rule}: ${i.message}`, i.severity === "error" ? "err" : "warn"); if (i.fix) log(`    fix: ${i.fix}`, "muted"); });
+  showValidation(r);
+}
+function showValidation(r) {
+  overlay.issueNodes = new Set(r.issues.flatMap(i => i.nodes)); overlay.issueLinks = new Set(r.issues.flatMap(i => i.links)); renderCanvas();
   const chip = $("status-chip"); chip.textContent = `health ${r.score}/100 · ${r.errors}E ${r.warnings}W`;
   chip.className = "status-chip " + (r.errors ? "err" : r.warnings ? "warn" : "ok");
+  const cards = r.issues.map((issue, index) => `<article class="issue-card">
+    <div class="issue-top"><span class="${issue.severity === "error" ? "issue-error" : "issue-warning"}">${esc(issue.severity.toUpperCase())} · ${esc(issue.rule)}</span>
+    <button class="btn-small fix-button" data-fix-index="${index}" ${issue.autofix ? "" : 'disabled title="No safe automatic fix is available for this issue."'}>Fix it</button></div>
+    <div>${esc(issue.message)}</div>${issue.fix ? `<div class="muted issue-suggestion">${esc(issue.fix)}</div>` : ""}
+    </article>`).join("");
+  const body = modal(`Validation · health ${r.score}/100`, cards || `<div class="banner info">No issues. Every validation rule passed.</div>`);
+  body.querySelectorAll("[data-fix-index]").forEach(button => button.onclick = async () => {
+    const issue = r.issues[+button.dataset.fixIndex];
+    button.disabled = true;
+    try {
+      const fixed = await api("/api/fix", { issue_index: +button.dataset.fixIndex,
+        issue_rule: issue.rule, issue_message: issue.message });
+      setTopology(fixed.topology, state.name);
+      log(`Applied automatic fix for ${issue.rule}.`, "ok");
+      showValidation(fixed.validation);
+    } catch (e) {
+      button.disabled = !issue.autofix;
+      log("Auto-fix error: " + e.message, "err");
+    }
+  });
 }
 $("btn-validate").onclick = () => runValidate().catch(e => log(e.message, "err"));
 
@@ -307,6 +330,17 @@ $("btn-matrix").onclick = async () => {
   r.matrix.forEach((row, i) => h += `<tr><th>${esc(r.labels[i])}</th>${row.map(v => v === null ? `<td class="s">—</td>` : v ? `<td class="y">✓</td>` : `<td class="n">✕</td>`).join("")}</tr>`);
   const total = r.matrix.flat().filter(v => v !== null), ok = total.filter(Boolean).length;
   modal("Reachability matrix", h + `</table><p class="muted">${ok} of ${total.length} host pairs can communicate.</p>`);
+};
+
+$("btn-resilience").onclick = async () => {
+  const r = await api("/api/resilience");
+  const rows = r.scenarios.map(s => `<tr><td>${esc(s.component)}</td><td>${esc(s.name)}</td>
+    <td class="${s.lost_pairs ? "n" : "y"}">${s.lost_pairs ? `Breaks ${s.lost_pairs} pair(s)` : "No loss"}</td>
+    <td>${s.broken_pairs.length ? s.broken_pairs.map(p => `${esc(p.from)} ↔ ${esc(p.to)}`).join(", ") : "—"}</td></tr>`).join("");
+  const h = `<div class="banner info"><b>Resilience score: ${r.score}/100</b> · ${r.tested} single failures tested · ${r.baseline_pairs} baseline reachable host pairs. The score is the average percentage of baseline connectivity retained across all tested failures.</div>
+    ${r.single_points_of_failure.length ? `<div class="banner err"><b>Single points of failure:</b> ${r.single_points_of_failure.map(s => esc(s.name)).join(", ")}</div>` : `<div class="banner info">No tested single failure breaks baseline host connectivity.</div>`}
+    ${r.tested ? `<table class="tbl"><tr><th>Component</th><th>Failed item</th><th>Impact</th><th>Connectivity lost</th></tr>${rows}</table>` : `<p class="muted">No active links or routers were available to test.</p>`}`;
+  modal("Resilience analysis", h);
 };
 
 $("btn-subnet").onclick = () => {

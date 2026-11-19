@@ -9,7 +9,7 @@ from netcore import simulation as sim
 from netcore.model import Net, normalise
 from netcore.routing import compute_tables, find_loops
 from netcore.templates_data import TEMPLATES
-from netcore.validation import validate
+from netcore.validation import apply_fix, validate
 
 
 def topo(key):
@@ -57,6 +57,29 @@ class ValidationTests(unittest.TestCase):
         t = topo("lan")
         t["nodes"] = [n for n in t["nodes"] if n["hostname"] != "H3"]
         self.assertIn("dangling_link", rules(t))
+
+    def test_auto_fixes_duplicate_ip_gateway_mask_and_vlan(self):
+        t = topo("debug_me")
+        for rule in ("duplicate_ip", "subnet_mismatch", "vlan_mismatch", "gateway_unreachable"):
+            for _ in range(12):
+                issues = validate(t)["issues"]
+                match = next(((k, issue) for k, issue in enumerate(issues) if issue["rule"] == rule), None)
+                if match is None:
+                    break
+                index, issue = match
+                self.assertTrue(issue.get("autofix"), rule)
+                t = apply_fix(t, index)
+            self.assertNotIn(rule, rules(t), rule)
+        self.assertEqual(node(t, "H2")["gateway"], "10.0.0.1")
+        self.assertEqual(node(t, "H3")["interfaces"][0]["mask"], "24")
+        self.assertEqual(node(t, "H4")["interfaces"][0]["vlan"], "1")
+
+    def test_auto_fix_rejects_unsupported_or_stale_issue(self):
+        t = topo("debug_me")
+        issues = validate(t)["issues"]
+        index = next(k for k, issue in enumerate(issues) if issue["rule"] == "isolated_node")
+        with self.assertRaises(ValueError):
+            apply_fix(t, index)
 
 
 class PingTests(unittest.TestCase):
@@ -150,6 +173,15 @@ class ToolTests(unittest.TestCase):
         m = sim.matrix(net, compute_tables(net))
         i, j = m["labels"].index("H2"), m["labels"].index("SRV")
         self.assertFalse(m["matrix"][i][j])
+
+    def test_resilience_tests_each_link_and_router_failure(self):
+        result = sim.resilience(Net(topo("failover")))
+        self.assertEqual(result["baseline_pairs"], 1)
+        self.assertEqual(result["tested"], 8)
+        self.assertLess(result["score"], 100)
+        self.assertTrue(any(s["component"] == "link" and s["lost_pairs"] for s in result["scenarios"]))
+        self.assertTrue(any(s["component"] == "router" and s["lost_pairs"] for s in result["scenarios"]))
+        self.assertTrue(result["single_points_of_failure"])
 
     def test_config_generation(self):
         from netcore.configgen import generate

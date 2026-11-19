@@ -32,13 +32,13 @@ hop by hop (ARP, TTL, routing lookups, firewall ACLs, VLANs, failed links) with 
 | Area | Feature |
 |---|---|
 | Design | Drag-and-drop canvas, auto port assignment, link cost/delay, drag to move, Delete key |
-| Validation | 20+ rules with a suggested fix, offending devices highlighted in red, health score /100 |
+| Validation | 20+ rules with a suggested fix, offending devices highlighted in red, health score /100, one-click fixes for duplicate IPs, gateways, safe mask mismatches and VLAN mismatches |
 | Routing | **OSPF** (Dijkstra on link cost) and **RIP** (hop count, 15-hop limit), static routes, administrative distance, longest-prefix match |
 | Simulation | Ping (request **and** reply), traceroute with RTT, ARP, TTL, animated forward/return path |
-| **Novelty** | **Compare RIP vs OSPF** on the same packet · **Link failure & automatic reroute** · **Firewall ACLs** with the blocking rule shown · **VLAN isolation** through switches · **Routing-loop detection** · **Reachability matrix** (all hosts pinging all hosts) · **Cisco-style config generator** · Subnet calculator |
+| **Novelty** | **Compare RIP vs OSPF** on the same packet · **Link failure & automatic reroute** · **Resilience analysis** (single-link/router failures, broken connectivity and resilience score) · **Firewall ACLs** with the blocking rule shown · **VLAN isolation** through switches · **Routing-loop detection** · **Reachability matrix** (all hosts pinging all hosts) · **Cisco-style config generator** · Subnet calculator |
 | Persistence | Named projects in SQLite, JSON import/export, 5 example labs |
 | Accounts | Home page, sign-up/login/logout, per-user saved projects |
-| Quality | Stateless API, 30 unit tests |
+| Quality | Stateless API, 33 unit tests |
 
 ## Validation rules
 
@@ -54,9 +54,9 @@ Browser (HTML/CSS/vanilla JS + SVG)  --JSON-->  Flask (app.py, stateless REST AP
                                                    |
                                   netcore/  store.py       SQLite: users + per-user projects
                                             model.py       topology model + Layer-2 reachability (VLAN-aware)
-                                            validation.py  rules engine
+                                            validation.py  rules engine + safe auto-fixes
                                             routing.py     OSPF/RIP tables, loop detection
-                                            simulation.py  packet forwarding, ping, traceroute, matrix, compare
+                                            simulation.py  packet forwarding, ping, traceroute, matrix, resilience analysis, compare
                                             configgen.py   Cisco-style config export
                                             templates_data.py  5 example labs
 ```
@@ -74,8 +74,8 @@ Every request carries the whole topology, so the server always works on exactly 
 ## Review demo (about 6 minutes)
 
 0. Open the **home page**, click *Get started*, create an account (or log in): you land in the interface.
-1. **Example labs → "1. Simple LAN"** → *Validate* (health 100) → select H1 → H3 → *Ping*. Say: same subnet, so ARP and direct delivery through the switch.
-2. **"5. Find the bugs"** → *Validate*. Red rings show duplicate IP, wrong gateway, mask mismatch, VLAN mismatch, isolated host — each with a suggested fix.
+1. **Example labs → "1. Simple LAN"** → *Validate* (health 100) → select H1 → H3 → *Ping*. Say: same subnet, so ARP and direct delivery through the switch. Try **Resilience analysis** to see how individual failures affect host reachability.
+2. **"5. Find the bugs"** → *Validate*. Red rings show duplicate IP, wrong gateway, mask mismatch, VLAN mismatch, isolated host — supported address, gateway, mask and VLAN issues have a **Fix it** button.
 3. **"2. RIP vs OSPF"** → From H1 To H2 → **Compare RIP vs OSPF**. RIP takes the 1-hop expensive link, OSPF takes the cheaper longer path. Then *Routing tables*.
 4. **"3. Link failure & reroute"** → Ping H1 → H2 → click the R1–R3 link → *Take link DOWN* → Ping again: traffic reroutes via R2.
 5. **"4. Firewall (ACL) lab"** → ping H1 → SRV works, H2 → SRV is blocked (red ring on R2, rule shown) → *Reachability matrix*.

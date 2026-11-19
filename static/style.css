@@ -101,6 +101,12 @@ select.field{cursor:pointer}
 .banner{padding:9px 12px;border-radius:6px;margin-bottom:10px;font-size:12.5px}
 .banner.err{background:rgba(251,106,106,.1);border:1px solid #5C2E30;color:var(--err)}
 .banner.info{background:rgba(94,234,212,.07);border:1px solid var(--accent-dim);color:var(--text)}
+.issue-card{border:1px solid var(--line);border-radius:7px;background:#0D1626;padding:10px 12px;margin-bottom:8px}
+.issue-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:5px;font-family:var(--mono);font-size:11px}
+.issue-error{color:var(--err)}.issue-warning{color:var(--warn)}
+.issue-suggestion{font-size:11px;margin-top:5px}
+.fix-button{flex-shrink:0;color:var(--accent);border-color:var(--accent-dim)}
+.fix-button:disabled{color:var(--muted);border-color:var(--line);cursor:not-allowed}
 .cfg{background:#070C17;border:1px solid var(--line);border-radius:6px;padding:12px;font-family:var(--mono);font-size:12px;white-space:pre;overflow:auto;max-height:52vh;margin:0}
 .cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .cmp-card{border:1px solid var(--line);border-radius:8px;padding:12px;background:#0D1626}

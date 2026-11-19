@@ -200,6 +200,62 @@ def matrix(net, tables):
     return {"labels": [h[0] for h in hosts], "ips": [h[1] for h in hosts], "matrix": rows}
 
 
+def resilience(net):
+    """Measure which baseline host pairs are lost by each single link/router failure."""
+    baseline = matrix(net, compute_tables(net))
+    reachable_pairs = [
+        (a, b) for a in range(len(baseline["labels"]))
+        for b in range(a + 1, len(baseline["labels"]))
+        if baseline["matrix"][a][b]
+    ]
+    scenarios = []
+
+    def evaluate(kind, component_id, name, failed_topology):
+        failed_net = Net(failed_topology)
+        after = matrix(failed_net, compute_tables(failed_net))
+        broken = []
+        for a, b in reachable_pairs:
+            if a >= len(after["labels"]) or b >= len(after["labels"]) or not after["matrix"][a][b]:
+                broken.append({"from": baseline["labels"][a], "to": baseline["labels"][b]})
+        scenarios.append({"component": kind, "id": component_id, "name": name,
+                          "lost_pairs": len(broken), "broken_pairs": broken})
+
+    for link_index, link in enumerate(net.links):
+        if not link["up"] or link["nodeA"] not in net.nodes or link["nodeB"] not in net.nodes:
+            continue
+        failed = copy.deepcopy(net.topo)
+        failed["links"][link_index]["up"] = False
+        evaluate("link", link["id"],
+                 f'{net.name(link["nodeA"])} ↔ {net.name(link["nodeB"])}',
+                 failed)
+
+    for router_id in net.routers():
+        router = net.nodes[router_id]
+        failed = copy.deepcopy(net.topo)
+        failed["nodes"] = [node for node in failed["nodes"] if node["id"] != router_id]
+        failed["links"] = [link for link in failed["links"]
+                           if link["nodeA"] != router_id and link["nodeB"] != router_id]
+        evaluate("router", router_id, router["hostname"], failed)
+
+    tested = len(scenarios)
+    if reachable_pairs and tested:
+        preserved = sum(len(reachable_pairs) - scenario["lost_pairs"] for scenario in scenarios)
+        score = round(100 * preserved / (len(reachable_pairs) * tested), 1)
+    else:
+        preserved = len(reachable_pairs) * tested
+        score = 100.0
+    return {
+        "labels": baseline["labels"],
+        "matrix": baseline["matrix"],
+        "baseline_pairs": len(reachable_pairs),
+        "scenarios": scenarios,
+        "single_points_of_failure": [s for s in scenarios if s["lost_pairs"]],
+        "tested": tested,
+        "preserved_pairs": preserved,
+        "score": score,
+    }
+
+
 def compare(topo, src_ip, dst_ip):
     """Run the same packet under RIP and under OSPF so the chosen paths can be compared."""
     out = []
